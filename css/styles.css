@@ -287,7 +287,7 @@ html, body {
     width: 100%;
     height: 100%;
     border: none;
-    pointer-events: auto;
+    pointer-events: none;
 }
 
 /* Block YouTube top-bar (logo, title link, share) with an overlay */

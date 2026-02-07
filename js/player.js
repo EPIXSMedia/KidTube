@@ -7,14 +7,14 @@
 const PlayerManager = (() => {
     let currentVideoIndex = 0;
     let videos = [];
-    let isMuted = true;  // Start muted (browsers require muted autoplay)
+    let isMuted = true;
     let isTransitioning = false;
     let onVideoChangeCallback = null;
     let onNeedMoreVideosCallback = null;
 
-    // Preload cache: index → iframe element
+    // Preload cache: index → { iframe, loaded }
     const preloaded = new Map();
-    const MAX_PRELOAD = 2; // preload next 2 videos
+    const MAX_PRELOAD = 2;
 
     // Touch/swipe tracking
     let touchStartY = 0;
@@ -24,23 +24,23 @@ const PlayerManager = (() => {
 
     const feed = () => document.getElementById('video-feed');
 
-    // Hidden container for preloading iframes off-screen
+    // Hidden container — uses real dimensions so iframes fully load
     function getPreloadContainer() {
         let container = document.getElementById('preload-container');
         if (!container) {
             container = document.createElement('div');
             container.id = 'preload-container';
-            container.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;';
+            container.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;overflow:hidden;pointer-events:none;opacity:0;z-index:-1;';
             document.body.appendChild(container);
         }
         return container;
     }
 
-    // Build a clean embed URL
-    function buildEmbedUrl(videoId, autoplay = true) {
+    // Build embed URL — preloads always use autoplay=1, mute=1 so they buffer
+    function buildEmbedUrl(videoId, forPreload = false) {
         const params = new URLSearchParams({
-            autoplay: autoplay ? '1' : '0',
-            mute: isMuted ? '1' : '0',
+            autoplay: '1',
+            mute: forPreload ? '1' : (isMuted ? '1' : '0'),
             rel: '0',
             modestbranding: '1',
             playsinline: '1',
@@ -54,6 +54,17 @@ const PlayerManager = (() => {
         return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
     }
 
+    // Send command to YouTube iframe via postMessage
+    function postCommand(iframe, command, args) {
+        try {
+            iframe.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func: command,
+                args: args || []
+            }), '*');
+        } catch (e) {}
+    }
+
     function init(options = {}) {
         onVideoChangeCallback = options.onVideoChange || null;
         onNeedMoreVideosCallback = options.onNeedMoreVideos || null;
@@ -64,7 +75,6 @@ const PlayerManager = (() => {
     }
 
     function setVideos(videoList, startIndex = 0) {
-        // Clear old preloads
         clearPreloads();
         videos = videoList;
         currentVideoIndex = startIndex;
@@ -73,15 +83,14 @@ const PlayerManager = (() => {
         }
     }
 
-    function createIframe(videoId, autoplay = true) {
+    function createIframe(videoId, forPreload = false) {
         const iframe = document.createElement('iframe');
-        iframe.src = buildEmbedUrl(videoId, autoplay);
+        iframe.src = buildEmbedUrl(videoId, forPreload);
         iframe.allow = 'autoplay; encrypted-media; gyroscope; picture-in-picture';
         iframe.allowFullscreen = true;
         iframe.setAttribute('frameborder', '0');
         iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
 
-        // Tell YouTube iframe we want state change events
         iframe.addEventListener('load', () => {
             try {
                 iframe.contentWindow.postMessage(JSON.stringify({
@@ -95,7 +104,7 @@ const PlayerManager = (() => {
         return iframe;
     }
 
-    // Preload upcoming videos off-screen so they buffer ahead of time
+    // Preload upcoming videos — they autoplay muted off-screen to buffer
     function preloadUpcoming() {
         const container = getPreloadContainer();
 
@@ -103,36 +112,45 @@ const PlayerManager = (() => {
             const nextIdx = currentVideoIndex + i;
             if (nextIdx < videos.length && !preloaded.has(nextIdx)) {
                 const video = videos[nextIdx];
-                // Create iframe with autoplay OFF so it just buffers
-                const iframe = createIframe(video.id, false);
+                const iframe = createIframe(video.id, true);
                 iframe.dataset.videoIndex = nextIdx;
                 container.appendChild(iframe);
-                preloaded.set(nextIdx, iframe);
+                preloaded.set(nextIdx, { iframe, loaded: false });
+
+                iframe.addEventListener('load', () => {
+                    const entry = preloaded.get(nextIdx);
+                    if (entry) entry.loaded = true;
+                }, { once: true });
             }
         }
 
-        // Also preload previous if available
+        // Preload previous
         const prevIdx = currentVideoIndex - 1;
         if (prevIdx >= 0 && !preloaded.has(prevIdx)) {
             const video = videos[prevIdx];
-            const iframe = createIframe(video.id, false);
+            const iframe = createIframe(video.id, true);
             iframe.dataset.videoIndex = prevIdx;
             container.appendChild(iframe);
-            preloaded.set(prevIdx, iframe);
+            preloaded.set(prevIdx, { iframe, loaded: false });
+
+            iframe.addEventListener('load', () => {
+                const entry = preloaded.get(prevIdx);
+                if (entry) entry.loaded = true;
+            }, { once: true });
         }
 
-        // Clean up preloads that are far away (keep only nearby)
-        for (const [idx, iframe] of preloaded) {
+        // Clean up distant preloads
+        for (const [idx, entry] of preloaded) {
             if (Math.abs(idx - currentVideoIndex) > MAX_PRELOAD + 1) {
-                iframe.remove();
+                entry.iframe.remove();
                 preloaded.delete(idx);
             }
         }
     }
 
     function clearPreloads() {
-        for (const [, iframe] of preloaded) {
-            iframe.remove();
+        for (const [, entry] of preloaded) {
+            entry.iframe.remove();
         }
         preloaded.clear();
     }
@@ -143,7 +161,6 @@ const PlayerManager = (() => {
         const video = videos[index];
         const feedEl = feed();
 
-        // Create the video slide
         const slide = document.createElement('div');
         slide.className = 'video-slide slide-center';
         slide.id = 'current-slide';
@@ -158,19 +175,14 @@ const PlayerManager = (() => {
 
         iframe.onload = () => {
             setTimeout(() => {
-                if (loading.parentNode) {
-                    loading.remove();
-                }
+                if (loading.parentNode) loading.remove();
             }, 300);
         };
 
         slide.appendChild(iframe);
 
-        // Remove old slides
         const oldSlide = feedEl.querySelector('#current-slide');
-        if (oldSlide) {
-            oldSlide.remove();
-        }
+        if (oldSlide) oldSlide.remove();
 
         feedEl.appendChild(slide);
         currentVideoIndex = index;
@@ -183,7 +195,7 @@ const PlayerManager = (() => {
             onNeedMoreVideosCallback();
         }
 
-        // Preload next videos after current one starts
+        // Start preloading after current loads
         setTimeout(() => preloadUpcoming(), 500);
     }
 
@@ -197,20 +209,20 @@ const PlayerManager = (() => {
         const oldSlide = feedEl.querySelector('#current-slide');
         const video = videos[newIndex];
 
-        // Create new slide off-screen
         const newSlide = document.createElement('div');
         newSlide.className = `video-slide ${direction === 'up' ? 'slide-down' : 'slide-up'}`;
         newSlide.id = 'new-slide';
 
         let iframe;
+        let wasPreloaded = false;
 
-        // Check if we have a preloaded iframe for this video
+        // Use preloaded iframe if available — just MOVE it, no src change
         if (preloaded.has(newIndex)) {
-            iframe = preloaded.get(newIndex);
+            const entry = preloaded.get(newIndex);
+            iframe = entry.iframe;
+            wasPreloaded = entry.loaded;
             iframe.remove(); // Remove from preload container
             preloaded.delete(newIndex);
-            // Switch to autoplay URL so it starts playing
-            iframe.src = buildEmbedUrl(video.id, true);
         } else {
             iframe = createIframe(video.id);
         }
@@ -218,7 +230,16 @@ const PlayerManager = (() => {
         newSlide.appendChild(iframe);
         feedEl.appendChild(newSlide);
 
-        // Trigger animation
+        // If preloaded iframe was muted but user wants sound, unmute via API
+        if (wasPreloaded && !isMuted) {
+            postCommand(iframe, 'unMute');
+        }
+        // If preloaded, make sure it's playing (it may have paused off-screen)
+        if (wasPreloaded) {
+            postCommand(iframe, 'playVideo');
+        }
+
+        // Trigger slide animation
         requestAnimationFrame(() => {
             if (oldSlide) {
                 oldSlide.className = `video-slide ${direction === 'up' ? 'slide-up' : 'slide-down'}`;
@@ -239,7 +260,6 @@ const PlayerManager = (() => {
                     onNeedMoreVideosCallback();
                 }
 
-                // Preload next batch
                 preloadUpcoming();
             }, 300);
         });
@@ -259,10 +279,14 @@ const PlayerManager = (() => {
 
     function toggleMute() {
         isMuted = !isMuted;
-        // Clear preloads (they have old mute state)
+        // Mute/unmute current video via postMessage (no reload)
+        const currentIframe = feed().querySelector('#current-slide iframe');
+        if (currentIframe) {
+            postCommand(currentIframe, isMuted ? 'mute' : 'unMute');
+        }
+        // Re-preload with correct mute state for future videos
         clearPreloads();
-        // Reload current video with new mute state
-        loadVideo(currentVideoIndex);
+        preloadUpcoming();
         return isMuted;
     }
 

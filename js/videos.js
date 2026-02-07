@@ -274,11 +274,11 @@ const VideoManager = (() => {
         }
     }
 
-    // Decode HTML entities in titles
+    // Decode HTML entities in titles (reuse single element)
+    const _decodeEl = document.createElement('textarea');
     function decodeHTMLEntities(text) {
-        const textarea = document.createElement('textarea');
-        textarea.innerHTML = text;
-        return textarea.value;
+        _decodeEl.innerHTML = text;
+        return _decodeEl.value;
     }
 
     return {

@@ -241,7 +241,7 @@ const PlayerManager = (() => {
 
                 // Preload next batch
                 preloadUpcoming();
-            }, 450);
+            }, 300);
         });
     }
 

@@ -61,6 +61,9 @@ const PlayerManager = (() => {
         iframe.allow = 'autoplay; encrypted-media; gyroscope; picture-in-picture';
         iframe.allowFullscreen = true;
         iframe.setAttribute('frameborder', '0');
+        // Sandbox: allow scripts + same-origin for YouTube playback,
+        // but block top-navigation, popups, and form submissions
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
 
         // Tell YouTube iframe we want state change events
         iframe.addEventListener('load', () => {

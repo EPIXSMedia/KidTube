@@ -576,14 +576,43 @@ const App = (() => {
     // ---- Lockdown (prevent kids from navigating away) ----
 
     function lockdown() {
+        // Block right-click
         document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Block keyboard shortcuts that navigate away
         document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey && (e.key === 'l' || e.key === 't')) || e.key === 'F5') {
+            // Block Ctrl+L (address bar), Ctrl+T (new tab), Ctrl+N (new window),
+            // Ctrl+W (close tab), F5 (refresh), Ctrl+R (refresh)
+            if (e.ctrlKey && ['l', 't', 'n', 'w', 'r'].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
+            if (['F5', 'F11'].includes(e.key)) {
+                e.preventDefault();
+            }
+            // Block Alt+Left/Right (browser back/forward)
+            if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
                 e.preventDefault();
             }
         });
+
+        // Block drag/drop (prevents dragging links out)
         document.addEventListener('dragstart', (e) => e.preventDefault());
         document.addEventListener('drop', (e) => e.preventDefault());
+
+        // Block any <a> link clicks that might somehow appear
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+
+        // Prevent back button navigation (push state trap)
+        history.pushState(null, '', location.href);
+        window.addEventListener('popstate', () => {
+            history.pushState(null, '', location.href);
+        });
     }
 
     // ---- Boot ----

@@ -1,7 +1,7 @@
 /* ========================================
    YouTube Shorts - Player Management
    Handles iframe embedding, autoplay,
-   and vertical swipe/scroll navigation
+   preloading, and vertical swipe/scroll
    ======================================== */
 
 const PlayerManager = (() => {
@@ -12,6 +12,10 @@ const PlayerManager = (() => {
     let onVideoChangeCallback = null;
     let onNeedMoreVideosCallback = null;
 
+    // Preload cache: index → iframe element
+    const preloaded = new Map();
+    const MAX_PRELOAD = 2; // preload next 2 videos
+
     // Touch/swipe tracking
     let touchStartY = 0;
     let touchDeltaY = 0;
@@ -20,20 +24,32 @@ const PlayerManager = (() => {
 
     const feed = () => document.getElementById('video-feed');
 
-    // Build a clean embed URL that won't trigger Error 153
-    function buildEmbedUrl(videoId) {
+    // Hidden container for preloading iframes off-screen
+    function getPreloadContainer() {
+        let container = document.getElementById('preload-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'preload-container';
+            container.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;';
+            document.body.appendChild(container);
+        }
+        return container;
+    }
+
+    // Build a clean embed URL
+    function buildEmbedUrl(videoId, autoplay = true) {
         const params = new URLSearchParams({
-            autoplay: '1',
+            autoplay: autoplay ? '1' : '0',
             mute: isMuted ? '1' : '0',
-            rel: '0',              // No related videos
-            modestbranding: '1',   // Minimal YouTube branding
+            rel: '0',
+            modestbranding: '1',
             playsinline: '1',
-            iv_load_policy: '3',   // No annotations
-            disablekb: '1',        // Disable keyboard controls (prevent navigating away)
-            fs: '0',               // Disable fullscreen button
-            cc_load_policy: '0',   // No captions by default
-            showinfo: '0',         // Hide video info
-            enablejsapi: '1'       // Enable JS API for auto-advance
+            iv_load_policy: '3',
+            disablekb: '1',
+            fs: '0',
+            cc_load_policy: '0',
+            showinfo: '0',
+            enablejsapi: '1'
         });
         return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
     }
@@ -48,6 +64,8 @@ const PlayerManager = (() => {
     }
 
     function setVideos(videoList, startIndex = 0) {
+        // Clear old preloads
+        clearPreloads();
         videos = videoList;
         currentVideoIndex = startIndex;
         if (videos.length > 0) {
@@ -55,14 +73,12 @@ const PlayerManager = (() => {
         }
     }
 
-    function createIframe(videoId) {
+    function createIframe(videoId, autoplay = true) {
         const iframe = document.createElement('iframe');
-        iframe.src = buildEmbedUrl(videoId);
+        iframe.src = buildEmbedUrl(videoId, autoplay);
         iframe.allow = 'autoplay; encrypted-media; gyroscope; picture-in-picture';
         iframe.allowFullscreen = true;
         iframe.setAttribute('frameborder', '0');
-        // Sandbox: allow scripts + same-origin for YouTube playback,
-        // but block top-navigation, popups, and form submissions
         iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
 
         // Tell YouTube iframe we want state change events
@@ -77,6 +93,48 @@ const PlayerManager = (() => {
         });
 
         return iframe;
+    }
+
+    // Preload upcoming videos off-screen so they buffer ahead of time
+    function preloadUpcoming() {
+        const container = getPreloadContainer();
+
+        for (let i = 1; i <= MAX_PRELOAD; i++) {
+            const nextIdx = currentVideoIndex + i;
+            if (nextIdx < videos.length && !preloaded.has(nextIdx)) {
+                const video = videos[nextIdx];
+                // Create iframe with autoplay OFF so it just buffers
+                const iframe = createIframe(video.id, false);
+                iframe.dataset.videoIndex = nextIdx;
+                container.appendChild(iframe);
+                preloaded.set(nextIdx, iframe);
+            }
+        }
+
+        // Also preload previous if available
+        const prevIdx = currentVideoIndex - 1;
+        if (prevIdx >= 0 && !preloaded.has(prevIdx)) {
+            const video = videos[prevIdx];
+            const iframe = createIframe(video.id, false);
+            iframe.dataset.videoIndex = prevIdx;
+            container.appendChild(iframe);
+            preloaded.set(prevIdx, iframe);
+        }
+
+        // Clean up preloads that are far away (keep only nearby)
+        for (const [idx, iframe] of preloaded) {
+            if (Math.abs(idx - currentVideoIndex) > MAX_PRELOAD + 1) {
+                iframe.remove();
+                preloaded.delete(idx);
+            }
+        }
+    }
+
+    function clearPreloads() {
+        for (const [, iframe] of preloaded) {
+            iframe.remove();
+        }
+        preloaded.clear();
     }
 
     function loadVideo(index) {
@@ -103,7 +161,7 @@ const PlayerManager = (() => {
                 if (loading.parentNode) {
                     loading.remove();
                 }
-            }, 800);
+            }, 300);
         };
 
         slide.appendChild(iframe);
@@ -124,6 +182,9 @@ const PlayerManager = (() => {
         if (index >= videos.length - 3 && onNeedMoreVideosCallback) {
             onNeedMoreVideosCallback();
         }
+
+        // Preload next videos after current one starts
+        setTimeout(() => preloadUpcoming(), 500);
     }
 
     function navigateToVideo(newIndex, direction) {
@@ -141,7 +202,19 @@ const PlayerManager = (() => {
         newSlide.className = `video-slide ${direction === 'up' ? 'slide-down' : 'slide-up'}`;
         newSlide.id = 'new-slide';
 
-        const iframe = createIframe(video.id);
+        let iframe;
+
+        // Check if we have a preloaded iframe for this video
+        if (preloaded.has(newIndex)) {
+            iframe = preloaded.get(newIndex);
+            iframe.remove(); // Remove from preload container
+            preloaded.delete(newIndex);
+            // Switch to autoplay URL so it starts playing
+            iframe.src = buildEmbedUrl(video.id, true);
+        } else {
+            iframe = createIframe(video.id);
+        }
+
         newSlide.appendChild(iframe);
         feedEl.appendChild(newSlide);
 
@@ -165,6 +238,9 @@ const PlayerManager = (() => {
                 if (newIndex >= videos.length - 3 && onNeedMoreVideosCallback) {
                     onNeedMoreVideosCallback();
                 }
+
+                // Preload next batch
+                preloadUpcoming();
             }, 450);
         });
     }
@@ -183,6 +259,8 @@ const PlayerManager = (() => {
 
     function toggleMute() {
         isMuted = !isMuted;
+        // Clear preloads (they have old mute state)
+        clearPreloads();
         // Reload current video with new mute state
         loadVideo(currentVideoIndex);
         return isMuted;
@@ -196,7 +274,6 @@ const PlayerManager = (() => {
         const feedEl = feed();
         const iframe = feedEl.querySelector('iframe');
         if (iframe) {
-            // Remove src to stop playback (most reliable method for cross-origin)
             iframe.src = '';
         }
     }
@@ -338,6 +415,7 @@ const PlayerManager = (() => {
     }
 
     function destroy() {
+        clearPreloads();
         const feedEl = feed();
         if (feedEl) feedEl.innerHTML = '';
         videos = [];

@@ -49,20 +49,25 @@ const PlayerManager = (() => {
             fs: '0',
             cc_load_policy: '0',
             showinfo: '0',
-            enablejsapi: '1'
+            enablejsapi: '1',
+            origin: window.location.origin
         });
         return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
     }
 
     // Send command to YouTube iframe via postMessage
     function postCommand(iframe, command, args) {
+        if (!iframe || !iframe.contentWindow) return;
+        const msg = JSON.stringify({
+            event: 'command',
+            func: command,
+            args: args || []
+        });
         try {
-            iframe.contentWindow.postMessage(JSON.stringify({
-                event: 'command',
-                func: command,
-                args: args || []
-            }), '*');
-        } catch (e) {}
+            iframe.contentWindow.postMessage(msg, 'https://www.youtube.com');
+        } catch (e) {
+            try { iframe.contentWindow.postMessage(msg, '*'); } catch (e2) {}
+        }
     }
 
     function init(options = {}) {
@@ -92,13 +97,12 @@ const PlayerManager = (() => {
         iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
 
         iframe.addEventListener('load', () => {
+            const listenMsg = JSON.stringify({ event: 'listening', id: 1, channel: 'widget' });
             try {
-                iframe.contentWindow.postMessage(JSON.stringify({
-                    event: 'listening',
-                    id: 1,
-                    channel: 'widget'
-                }), '*');
-            } catch (e) {}
+                iframe.contentWindow.postMessage(listenMsg, 'https://www.youtube.com');
+            } catch (e) {
+                try { iframe.contentWindow.postMessage(listenMsg, '*'); } catch (e2) {}
+            }
         });
 
         return iframe;
@@ -282,7 +286,10 @@ const PlayerManager = (() => {
         // Mute/unmute current video via postMessage (no reload)
         const currentIframe = feed().querySelector('#current-slide iframe');
         if (currentIframe) {
-            postCommand(currentIframe, isMuted ? 'mute' : 'unMute');
+            const cmd = isMuted ? 'mute' : 'unMute';
+            postCommand(currentIframe, cmd);
+            // Retry after short delay in case API wasn't ready
+            setTimeout(() => postCommand(currentIframe, cmd), 300);
         }
         // Re-preload with correct mute state for future videos
         clearPreloads();

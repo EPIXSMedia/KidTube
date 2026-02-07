@@ -81,6 +81,9 @@ const App = (() => {
         // Load mixed feed from all enabled categories
         await loadMixedFeed();
 
+        // Start screen time tracking
+        ParentalControls.startScreenTimeTracking();
+
         // Start timer if enabled
         startTimerIfNeeded();
 
@@ -281,6 +284,12 @@ const App = (() => {
             renderWatchHistory();
         });
 
+        // Clear screen time
+        document.getElementById('clear-screen-time-btn')?.addEventListener('click', () => {
+            ParentalControls.clearScreenTime();
+            renderScreenTimeDashboard();
+        });
+
         // Change PIN
         changePinBtn.addEventListener('click', async () => {
             closeSettings();
@@ -323,6 +332,7 @@ const App = (() => {
             if (verified) {
                 document.getElementById('times-up-modal').classList.add('hidden');
                 ParentalControls.resetTimer();
+                ParentalControls.startScreenTimeTracking();
             }
         });
 
@@ -376,6 +386,9 @@ const App = (() => {
         document.getElementById('bedtime-select').value = ParentalControls.getBedtimeHour().toString();
         updateBedtimeOptionsVisibility();
 
+        // Render screen time dashboard
+        renderScreenTimeDashboard();
+
         // Render blocked channels
         renderBlockedChannels();
 
@@ -424,6 +437,38 @@ const App = (() => {
                 </div>
             </div>`;
         }).join('');
+    }
+
+    function renderScreenTimeDashboard() {
+        const todayEl = document.getElementById('st-today-value');
+        const chartEl = document.getElementById('screen-time-chart');
+        if (!todayEl || !chartEl) return;
+
+        const todaySec = ParentalControls.getTodayScreenTime();
+        todayEl.textContent = formatScreenTime(todaySec);
+
+        const weekly = ParentalControls.getWeeklyScreenTime();
+        const maxSec = Math.max(...weekly.map(d => d.seconds), 1);
+
+        chartEl.innerHTML = weekly.map(d => {
+            const pct = Math.round((d.seconds / maxSec) * 100);
+            const label = formatScreenTime(d.seconds);
+            const isToday = d.date === new Date().toISOString().split('T')[0];
+            return `<div class="st-bar-col${isToday ? ' st-today' : ''}">
+                <div class="st-bar-value">${d.seconds > 0 ? label : ''}</div>
+                <div class="st-bar-track"><div class="st-bar-fill" style="height:${Math.max(pct, 2)}%"></div></div>
+                <div class="st-bar-day">${d.day}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function formatScreenTime(seconds) {
+        if (seconds < 60) return seconds + 's';
+        const m = Math.floor(seconds / 60);
+        if (m < 60) return m + ' min';
+        const h = Math.floor(m / 60);
+        const rm = m % 60;
+        return rm > 0 ? h + 'h ' + rm + 'm' : h + 'h';
     }
 
     function saveSettings() {
@@ -560,6 +605,7 @@ const App = (() => {
 
     function handleTimesUp() {
         PlayerManager.pausePlayback();
+        ParentalControls.stopScreenTimeTracking();
         document.getElementById('times-up-modal').classList.remove('hidden');
     }
 

@@ -16,7 +16,8 @@ const ParentalControls = (() => {
         DAILY_RESET: 'kidtube_daily_reset',
         LAST_RESET_DATE: 'kidtube_last_reset_date',
         WATCH_HISTORY: 'kidtube_watch_history',
-        BLOCKED_CHANNELS: 'kidtube_blocked_channels'
+        BLOCKED_CHANNELS: 'kidtube_blocked_channels',
+        SCREEN_TIME: 'kidtube_screen_time'
     };
 
     // All available categories
@@ -441,6 +442,82 @@ const ParentalControls = (() => {
         return blocked.includes(channelName.trim().toLowerCase());
     }
 
+    // ---- Screen Time Tracking ----
+
+    let screenTimeInterval = null;
+    let pendingSeconds = 0;
+
+    function getScreenTimeData() {
+        const stored = localStorage.getItem(STORAGE_KEYS.SCREEN_TIME);
+        if (stored) {
+            try { return JSON.parse(stored); } catch (e) {}
+        }
+        return {};
+    }
+
+    function flushScreenTime() {
+        if (pendingSeconds === 0) return;
+        const today = new Date().toISOString().split('T')[0];
+        const data = getScreenTimeData();
+        data[today] = (data[today] || 0) + pendingSeconds;
+        // Keep only last 30 days
+        const keys = Object.keys(data).sort();
+        if (keys.length > 30) {
+            keys.slice(0, keys.length - 30).forEach(k => delete data[k]);
+        }
+        localStorage.setItem(STORAGE_KEYS.SCREEN_TIME, JSON.stringify(data));
+        pendingSeconds = 0;
+    }
+
+    function startScreenTimeTracking() {
+        stopScreenTimeTracking();
+        screenTimeInterval = setInterval(() => {
+            pendingSeconds++;
+            if (pendingSeconds >= 10) flushScreenTime();
+        }, 1000);
+    }
+
+    function stopScreenTimeTracking() {
+        if (screenTimeInterval) {
+            clearInterval(screenTimeInterval);
+            screenTimeInterval = null;
+        }
+        flushScreenTime();
+    }
+
+    function getTodayScreenTime() {
+        flushScreenTime();
+        const today = new Date().toISOString().split('T')[0];
+        const data = getScreenTimeData();
+        return data[today] || 0;
+    }
+
+    function getWeeklyScreenTime() {
+        flushScreenTime();
+        const data = getScreenTimeData();
+        const result = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const key = d.toISOString().split('T')[0];
+            result.push({
+                date: key,
+                day: d.toLocaleDateString('en', { weekday: 'short' }),
+                seconds: data[key] || 0
+            });
+        }
+        return result;
+    }
+
+    function clearScreenTime() {
+        localStorage.removeItem(STORAGE_KEYS.SCREEN_TIME);
+    }
+
+    // Flush on page hide/visibility change
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) flushScreenTime();
+    });
+
     // ---- API Key ----
 
     function getApiKey() { return localStorage.getItem(STORAGE_KEYS.API_KEY) || ''; }
@@ -465,6 +542,8 @@ const ParentalControls = (() => {
         getApiKey, setApiKey, hasApiKey,
         addToHistory, getWatchHistory, clearWatchHistory,
         blockChannel, unblockChannel, getBlockedChannels, isChannelBlocked,
+        startScreenTimeTracking, stopScreenTimeTracking,
+        getTodayScreenTime, getWeeklyScreenTime, clearScreenTime,
         resetAll
     };
 })();

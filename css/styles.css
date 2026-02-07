@@ -867,7 +867,6 @@ html, body {
 .history-list {
     max-height: 200px;
     overflow-y: auto;
-    scrollbar-width: thin;
 }
 
 .blocked-item,
@@ -1249,10 +1248,32 @@ html, body {
 /* ========================================
    Scrollbar hiding
    ======================================== */
-::-webkit-scrollbar {
+body,
+#video-feed {
+    scrollbar-width: none;
+}
+
+body::-webkit-scrollbar,
+#video-feed::-webkit-scrollbar {
     display: none;
 }
 
-* {
-    scrollbar-width: none;
+.settings-content,
+.blocked-list,
+.history-list {
+    scrollbar-width: thin;
+}
+
+.settings-content::-webkit-scrollbar,
+.blocked-list::-webkit-scrollbar,
+.history-list::-webkit-scrollbar {
+    display: block;
+    width: 4px;
+}
+
+.settings-content::-webkit-scrollbar-thumb,
+.blocked-list::-webkit-scrollbar-thumb,
+.history-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
 }

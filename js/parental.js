@@ -510,6 +510,7 @@ const ParentalControls = (() => {
     }
 
     function clearScreenTime() {
+        pendingSeconds = 0;
         localStorage.removeItem(STORAGE_KEYS.SCREEN_TIME);
     }
 
@@ -529,6 +530,7 @@ const ParentalControls = (() => {
     function resetAll() {
         Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
         stopTimer();
+        stopScreenTimeTracking();
     }
 
     return {

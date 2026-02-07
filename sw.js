@@ -1,4 +1,4 @@
-const CACHE_NAME = 'youtube-kids-v16';
+const CACHE_NAME = 'youtube-kids-v17';
 const ASSETS_TO_CACHE = [
     './',
     'index.html',

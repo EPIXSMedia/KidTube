@@ -200,7 +200,7 @@ const App = (() => {
             const merged = [...existing, ...shuffle([...upcoming, ...fresh])];
             mixedVideos = merged;
 
-            PlayerManager.setVideos(mixedVideos, currentIndex);
+            PlayerManager.updateVideos(mixedVideos, currentIndex);
         } catch (err) {
             console.error('Failed to load more videos:', err);
         } finally {
@@ -407,8 +407,8 @@ const App = (() => {
         }
         container.innerHTML = blocked.map(ch =>
             `<div class="blocked-item">
-                <span class="blocked-item-name">${ch}</span>
-                <button class="unblock-btn" data-channel="${ch}">Unblock</button>
+                <span class="blocked-item-name">${escapeHtml(ch)}</span>
+                <button class="unblock-btn" data-channel="${escapeHtml(ch)}">Unblock</button>
             </div>`
         ).join('');
         container.querySelectorAll('.unblock-btn').forEach(btn => {
@@ -432,11 +432,17 @@ const App = (() => {
             const timeStr = date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             return `<div class="history-item">
                 <div class="history-item-info">
-                    <div class="history-item-title">${item.title}</div>
-                    <div class="history-item-meta">${item.channel} &middot; ${timeStr}</div>
+                    <div class="history-item-title">${escapeHtml(item.title)}</div>
+                    <div class="history-item-meta">${escapeHtml(item.channel)} &middot; ${timeStr}</div>
                 </div>
             </div>`;
         }).join('');
+    }
+
+    function escapeHtml(str) {
+        const el = document.createElement('span');
+        el.textContent = str;
+        return el.innerHTML;
     }
 
     function renderScreenTimeDashboard() {

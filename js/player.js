@@ -88,6 +88,14 @@ const PlayerManager = (() => {
         }
     }
 
+    // Update video list without reloading current video (for appending new videos)
+    function updateVideos(videoList, currentIdx) {
+        videos = videoList;
+        currentVideoIndex = currentIdx;
+        clearPreloads();
+        preloadUpcoming();
+    }
+
     function createIframe(videoId, forPreload = false) {
         const iframe = document.createElement('iframe');
         iframe.src = buildEmbedUrl(videoId, forPreload);
@@ -456,6 +464,7 @@ const PlayerManager = (() => {
     return {
         init,
         setVideos,
+        updateVideos,
         loadVideo,
         nextVideo,
         prevVideo,

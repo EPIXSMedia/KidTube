@@ -1,0 +1,1040 @@
+/* ========================================
+   YouTube Shorts - Kid Safe Edition
+   Matches YouTube's exact look and feel
+   ======================================== */
+
+:root {
+    --yt-bg: #0f0f0f;
+    --yt-bg-elevated: #212121;
+    --yt-bg-hover: #3f3f3f;
+    --yt-red: #FF0000;
+    --yt-red-hover: #cc0000;
+    --yt-white: #ffffff;
+    --yt-text-primary: #f1f1f1;
+    --yt-text-secondary: #aaaaaa;
+    --yt-chip-bg: rgba(255, 255, 255, 0.1);
+    --yt-chip-active: #f1f1f1;
+    --yt-chip-active-text: #0f0f0f;
+    --yt-overlay: rgba(0, 0, 0, 0.6);
+    --warning: #ff9800;
+    --danger: #f44336;
+    --font: 'Roboto', Arial, sans-serif;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--font);
+    background: var(--yt-bg);
+    color: var(--yt-text-primary);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* ========================================
+   Splash Screen (YouTube loading style)
+   ======================================== */
+.splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--yt-bg);
+    transition: opacity 0.5s, visibility 0.5s;
+}
+
+.splash-screen.fade-out {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.splash-content {
+    text-align: center;
+}
+
+.splash-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+}
+
+.yt-logo-splash {
+    width: 200px;
+    height: 46px;
+}
+
+.loader {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--yt-red);
+    border-radius: 50%;
+    margin: 0 auto;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Utility
+   ======================================== */
+.hidden {
+    display: none !important;
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+.btn-primary {
+    width: 100%;
+    padding: 12px 24px;
+    background: var(--yt-red);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background: var(--yt-red-hover);
+}
+
+.btn-secondary {
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--yt-text-primary);
+    border: none;
+    border-radius: 20px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-text {
+    padding: 10px 20px;
+    background: none;
+    color: var(--yt-text-secondary);
+    border: none;
+    font-family: var(--font);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.btn-danger {
+    padding: 10px 20px;
+    background: rgba(255, 0, 0, 0.1);
+    color: var(--yt-red);
+    border: none;
+    border-radius: 20px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-danger:hover {
+    background: rgba(255, 0, 0, 0.2);
+}
+
+.hint {
+    font-size: 12px;
+    color: var(--yt-text-secondary);
+    margin-top: 8px;
+}
+
+/* ========================================
+   Main App
+   ======================================== */
+.app {
+    position: fixed;
+    inset: 0;
+    background: var(--yt-bg);
+    overflow: hidden;
+}
+
+/* ========================================
+   Top Bar (Shorts logo + category chips)
+   ======================================== */
+.category-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    padding-top: var(--safe-top);
+    background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 60%, transparent 100%);
+    pointer-events: none;
+}
+
+.top-bar-inner {
+    display: flex;
+    align-items: center;
+    padding: 10px 10px 12px;
+    gap: 8px;
+    pointer-events: auto;
+}
+
+/* YouTube Shorts logo */
+.shorts-logo {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.shorts-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.shorts-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--yt-white);
+    letter-spacing: -0.3px;
+}
+
+/* Category chip tabs (YouTube style) */
+.category-tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    flex: 1;
+    min-width: 0;
+}
+
+.category-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.cat-tab {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 18px;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    line-height: 1.3;
+}
+
+.cat-tab:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.cat-tab.active {
+    background: var(--yt-chip-active);
+    color: var(--yt-chip-active-text);
+    border-color: var(--yt-chip-active);
+    font-weight: 500;
+}
+
+/* ========================================
+   Video Feed
+   ======================================== */
+.video-feed {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+}
+
+.video-slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--yt-bg);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-slide iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    pointer-events: auto;
+}
+
+/* Block YouTube top-bar (logo, title link, share) with an overlay */
+.video-slide::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    z-index: 5;
+    pointer-events: auto;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
+}
+
+/* Block YouTube bottom-bar (watch on YouTube link) */
+.video-slide::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 60px;
+    height: 50px;
+    z-index: 5;
+    pointer-events: auto;
+}
+
+.video-slide.slide-up {
+    transform: translateY(-100%);
+}
+
+.video-slide.slide-down {
+    transform: translateY(100%);
+}
+
+.video-slide.slide-center {
+    transform: translateY(0);
+}
+
+.video-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--yt-bg);
+    z-index: 2;
+}
+
+.video-loading .loader {
+    width: 44px;
+    height: 44px;
+}
+
+.video-loading p {
+    color: var(--yt-text-secondary);
+    font-size: 14px;
+}
+
+/* ========================================
+   Navigation Arrows (desktop)
+   ======================================== */
+.nav-arrow {
+    position: fixed;
+    right: 24px;
+    z-index: 40;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.nav-arrow:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.nav-up {
+    bottom: calc(50% + 30px);
+}
+
+.nav-down {
+    bottom: calc(50% - 78px);
+}
+
+/* ========================================
+   Right-side Action Buttons (YouTube Shorts)
+   ======================================== */
+.action-buttons {
+    position: fixed;
+    right: 12px;
+    bottom: calc(100px + var(--safe-bottom));
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px;
+    transition: transform 0.15s;
+}
+
+.action-btn:active {
+    transform: scale(0.9);
+}
+
+.action-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--yt-text-primary);
+    font-family: var(--font);
+}
+
+/* ========================================
+   Video Info Overlay
+   ======================================== */
+.video-info {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 80px;
+    z-index: 30;
+    padding: 48px 16px calc(16px + var(--safe-bottom)) 16px;
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 70%, transparent 100%);
+    pointer-events: none;
+}
+
+.video-title {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-bottom: 6px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--yt-text-primary);
+}
+
+.video-channel {
+    font-size: 13px;
+    color: var(--yt-text-secondary);
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.video-channel::before {
+    content: '';
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #717171;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   Settings Button (3-dot menu, subtle)
+   ======================================== */
+.settings-btn {
+    position: fixed;
+    right: 16px;
+    top: calc(14px + var(--safe-top));
+    z-index: 55;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    opacity: 0.7;
+}
+
+.settings-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    opacity: 1;
+}
+
+/* ========================================
+   Timer Display
+   ======================================== */
+.timer-display {
+    position: fixed;
+    top: calc(56px + var(--safe-top));
+    right: 12px;
+    z-index: 55;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--yt-text-secondary);
+}
+
+.timer-display.warning {
+    color: var(--warning);
+}
+
+.timer-display.critical {
+    color: var(--danger);
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* ========================================
+   Modals
+   ======================================== */
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.modal-content {
+    position: relative;
+    z-index: 1;
+    background: #282828;
+    border-radius: var(--radius);
+    padding: 32px;
+    width: 90%;
+    max-width: 360px;
+    text-align: center;
+}
+
+/* ========================================
+   PIN Modal
+   ======================================== */
+.pin-modal-content h2 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.pin-modal-content p {
+    color: var(--yt-text-secondary);
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
+.pin-dots {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.pin-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.15s;
+}
+
+.pin-dot.filled {
+    background: var(--yt-red);
+    border-color: var(--yt-red);
+}
+
+.pin-error {
+    color: var(--danger);
+    font-size: 13px;
+    margin-bottom: 12px;
+    min-height: 18px;
+}
+
+.pin-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-width: 240px;
+    margin: 16px auto;
+}
+
+.pin-key {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    color: white;
+    font-family: var(--font);
+    font-size: 22px;
+    font-weight: 400;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    transition: background 0.15s;
+}
+
+.pin-key:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.pin-key:active {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.pin-key-empty {
+    visibility: hidden;
+}
+
+.pin-key-back {
+    font-size: 20px;
+}
+
+/* ========================================
+   Settings Panel
+   ======================================== */
+.settings-content {
+    max-width: 440px;
+    max-height: 85vh;
+    overflow-y: auto;
+    text-align: left;
+    padding: 24px;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.settings-header h2 {
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.setting-group {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.setting-group:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.setting-group h3 {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: var(--yt-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.setting-row label {
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.setting-row select {
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--yt-text-primary);
+    font-family: var(--font);
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+}
+
+.setting-row select option {
+    background: #282828;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 26px;
+    transition: background 0.3s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: #065fd4;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(22px);
+}
+
+/* ========================================
+   Settings - Checkbox Grid
+   ======================================== */
+.setting-hint {
+    font-size: 12px;
+    color: var(--yt-text-secondary);
+    margin-bottom: 10px;
+}
+
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 13px;
+}
+
+.checkbox-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #065fd4;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.checkbox-item span {
+    color: var(--yt-text-primary);
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+/* ========================================
+   Blocked Channels & Watch History
+   ======================================== */
+.blocked-list,
+.history-list {
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.blocked-item,
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 13px;
+}
+
+.blocked-item:last-child,
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.blocked-item-name,
+.history-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-item-title {
+    color: var(--yt-text-primary);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-item-meta {
+    color: var(--yt-text-secondary);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.unblock-btn {
+    background: none;
+    border: none;
+    color: var(--yt-red);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    font-family: var(--font);
+}
+
+.unblock-btn:hover {
+    background: rgba(255, 0, 0, 0.1);
+}
+
+.empty-state {
+    color: var(--yt-text-secondary);
+    font-size: 12px;
+    text-align: center;
+    padding: 12px 0;
+}
+
+/* ========================================
+   Guide & Branding
+   ======================================== */
+.guide-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.guide-list li {
+    position: relative;
+    padding: 4px 0 4px 16px;
+    font-size: 12px;
+    color: var(--yt-text-secondary);
+    line-height: 1.5;
+}
+
+.guide-list li::before {
+    content: '\2022';
+    position: absolute;
+    left: 0;
+    color: var(--yt-red);
+}
+
+.guide-list li strong {
+    color: var(--yt-text-primary);
+}
+
+.pin-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pin-actions .btn-secondary,
+.pin-actions .btn-danger {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    font-size: 13px;
+    padding: 8px 12px;
+}
+
+.branding-section {
+    text-align: center;
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+}
+
+.branding-text {
+    font-size: 13px;
+    color: var(--yt-text-primary);
+    margin-bottom: 4px;
+}
+
+.branding-sub {
+    font-size: 11px;
+    color: var(--yt-text-secondary);
+}
+
+/* ========================================
+   Time's Up Modal
+   ======================================== */
+.times-up-content {
+    padding: 40px 32px;
+}
+
+.times-up-icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+}
+
+.times-up-content h2 {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--yt-text-primary);
+}
+
+.times-up-content p {
+    color: var(--yt-text-secondary);
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.times-up-content .btn-primary {
+    margin-top: 16px;
+}
+
+/* ========================================
+   Tap to Unmute Overlay
+   ======================================== */
+.unmute-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.unmute-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: pulse-unmute 2s ease-in-out infinite;
+}
+
+.unmute-pill span {
+    color: white;
+    font-size: 15px;
+    font-weight: 500;
+    font-family: var(--font);
+}
+
+@keyframes pulse-unmute {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
+}
+
+/* ========================================
+   Responsive (desktop: constrain video)
+   ======================================== */
+@media (min-width: 768px) {
+    .video-slide iframe {
+        max-width: 405px;
+        max-height: 720px;
+        margin: 0 auto;
+    }
+
+    .video-info {
+        max-width: 405px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+    }
+
+    .action-buttons {
+        right: calc(50% - 240px);
+    }
+}
+
+/* ========================================
+   Scrollbar hiding
+   ======================================== */
+::-webkit-scrollbar {
+    display: none;
+}
+
+* {
+    scrollbar-width: none;
+}

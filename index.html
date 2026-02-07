@@ -143,6 +143,21 @@
                 <span>Tap to unmute</span>
             </div>
         </div>
+
+        <!-- Install App Banner -->
+        <div id="install-banner" class="install-banner hidden">
+            <div class="install-banner-inner">
+                <div class="install-banner-icon">
+                    <svg viewBox="0 0 24 24" width="36" height="36"><rect width="24" height="24" rx="5" fill="#FF0000"/><polygon points="9.5,6.5 9.5,17.5 18,12" fill="white"/></svg>
+                </div>
+                <div class="install-banner-text">
+                    <strong>YouTube</strong>
+                    <span>Install app for the best experience</span>
+                </div>
+                <button id="install-btn" class="install-banner-btn">Install</button>
+                <button id="install-dismiss" class="install-banner-close">&times;</button>
+            </div>
+        </div>
     </div>
 
     <!-- PIN Entry Modal -->
@@ -362,6 +377,44 @@
                 .then(() => console.log('SW registered'))
                 .catch((err) => console.log('SW registration failed:', err));
         }
+
+        // PWA Install Prompt
+        let deferredPrompt = null;
+        const installBanner = document.getElementById('install-banner');
+        const installBtn = document.getElementById('install-btn');
+        const installDismiss = document.getElementById('install-dismiss');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show install banner after a short delay
+            setTimeout(() => {
+                if (installBanner) installBanner.classList.remove('hidden');
+            }, 3000);
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                const result = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                if (installBanner) installBanner.classList.add('hidden');
+            });
+        }
+
+        if (installDismiss) {
+            installDismiss.addEventListener('click', () => {
+                if (installBanner) installBanner.classList.add('hidden');
+                deferredPrompt = null;
+            });
+        }
+
+        // Hide banner if app is already installed
+        window.addEventListener('appinstalled', () => {
+            if (installBanner) installBanner.classList.add('hidden');
+            deferredPrompt = null;
+        });
     </script>
 
     <!-- Google Analytics (GA4) - loaded last, non-blocking -->

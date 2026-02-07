@@ -364,7 +364,7 @@ html, body {
     border: none;
     color: white;
     cursor: pointer;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     transition: background 0.2s;
@@ -1076,6 +1076,7 @@ html, body {
     }
 
     .nav-arrow {
+        display: flex;
         opacity: 0;
         transition: opacity 0.3s, background 0.2s;
     }

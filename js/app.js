@@ -172,7 +172,8 @@ const App = (() => {
 
     function handleVideoChange(video, index, total) {
         document.getElementById('video-title').textContent = video.title;
-        document.getElementById('video-channel').textContent = video.channel;
+        document.getElementById('video-channel').textContent = '@' + video.channel.replace(/\s+/g, '');
+        document.getElementById('audio-name').textContent = video.channel + ' \u00B7 Original audio';
         PlayerManager.updateNavButtons();
 
         // Record to watch history
@@ -325,9 +326,10 @@ const App = (() => {
             }
         });
 
-        // Like/Share are decorative
+        // Like/Share/Comment are decorative
         document.getElementById('like-btn')?.addEventListener('click', () => {});
         document.getElementById('share-btn')?.addEventListener('click', () => {});
+        document.getElementById('comment-btn')?.addEventListener('click', () => {});
 
         // Dislike = block this channel and skip
         document.getElementById('dislike-btn')?.addEventListener('click', () => {

@@ -1,0 +1,13 @@
+{
+  "appId": "com.epixsmedia.kidtube",
+  "appName": "KidTube",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}

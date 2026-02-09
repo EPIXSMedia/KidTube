@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">KidTube</string>
+    <string name="title_activity_main">KidTube</string>
+    <string name="package_name">com.epixsmedia.kidtube</string>
+    <string name="custom_url_scheme">com.epixsmedia.kidtube</string>
+</resources>

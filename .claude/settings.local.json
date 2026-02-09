@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m http.server:*)",
+      "Bash(start \"\" \"http://localhost:3000\")",
+      "Bash(export ANDROID_SDK_ROOT:*)",
+      "Bash(export ANDROID_HOME:*)",
+      "Bash(npx cap add android:*)"
+    ]
+  }
+}

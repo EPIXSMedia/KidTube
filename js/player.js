@@ -14,7 +14,7 @@ const PlayerManager = (() => {
 
     // Preload cache: index → { iframe, loaded }
     const preloaded = new Map();
-    const MAX_PRELOAD = 2;
+    const MAX_PRELOAD = 3;
 
     // Touch/swipe tracking
     let touchStartY = 0;
@@ -218,8 +218,8 @@ const PlayerManager = (() => {
             onNeedMoreVideosCallback();
         }
 
-        // Start preloading after current loads
-        setTimeout(() => preloadUpcoming(), 500);
+        // Start preloading next videos immediately
+        preloadUpcoming();
     }
 
     function navigateToVideo(newIndex, direction) {
@@ -239,19 +239,19 @@ const PlayerManager = (() => {
         let iframe;
         let wasPreloaded = false;
 
-        // Use preloaded iframe if available — just MOVE it, no src change
+        // Use preloaded iframe if available — move it without DOM detach
         if (preloaded.has(newIndex)) {
             const entry = preloaded.get(newIndex);
             iframe = entry.iframe;
             wasPreloaded = entry.loaded;
-            iframe.remove(); // Remove from preload container
             preloaded.delete(newIndex);
         } else {
             iframe = createIframe(video.id);
         }
 
-        newSlide.appendChild(iframe);
+        // Append slide to DOM first, then move iframe into it (avoids detach)
         feedEl.appendChild(newSlide);
+        newSlide.appendChild(iframe);
 
         // Trigger slide animation
         requestAnimationFrame(() => {
@@ -266,11 +266,12 @@ const PlayerManager = (() => {
                 currentVideoIndex = newIndex;
                 isTransitioning = false;
 
-                // Apply mute state after transition — retry so YouTube API has time to init
+                // Apply mute state after transition — retry for unmute only
                 if (wasPreloaded) {
                     const muteCmd = isMuted ? 'mute' : 'unMute';
                     postCommandRetry(iframe, muteCmd);
-                    postCommandRetry(iframe, 'playVideo');
+                    // Single playVideo nudge (don't retry — retries restart buffering)
+                    postCommand(iframe, 'playVideo');
                 }
 
                 if (onVideoChangeCallback) {
@@ -300,17 +301,17 @@ const PlayerManager = (() => {
 
     function toggleMute() {
         isMuted = !isMuted;
+        const cmd = isMuted ? 'mute' : 'unMute';
         // Mute/unmute current video via postMessage (no reload)
         const currentIframe = feed().querySelector('#current-slide iframe');
         if (currentIframe) {
-            const cmd = isMuted ? 'mute' : 'unMute';
             postCommand(currentIframe, cmd);
-            // Retry after short delay in case API wasn't ready
             setTimeout(() => postCommand(currentIframe, cmd), 300);
         }
-        // Re-preload with correct mute state for future videos
-        clearPreloads();
-        preloadUpcoming();
+        // Update preloaded iframes in-place (don't destroy their buffer)
+        for (const [, entry] of preloaded) {
+            postCommand(entry.iframe, cmd);
+        }
         return isMuted;
     }
 

@@ -1215,7 +1215,7 @@ html, body {
 /* ========================================
    Responsive (desktop: constrain video)
    ======================================== */
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
     .video-slide iframe {
         max-width: 405px;
         max-height: 720px;

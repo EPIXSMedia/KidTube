@@ -4,9 +4,6 @@
    ======================================== */
 
 const App = (() => {
-    // Hardcoded API key (no setup screen needed)
-    const API_KEY = 'AIzaSyDep5wt_AnB-F65To-4FB99Zgs3xTvxTb4';
-
     let isLoadingMore = false;
     let isInitialized = false;
     let mixedVideos = [];
@@ -14,10 +11,6 @@ const App = (() => {
     async function init() {
         // Initialize PIN pad
         ParentalControls.initPinPad();
-
-        // Set the API key directly
-        VideoManager.setApiKey(API_KEY);
-        ParentalControls.setApiKey(API_KEY);
 
         // Check daily reset
         ParentalControls.checkDailyReset();
@@ -122,6 +115,8 @@ const App = (() => {
             </div>
         `;
 
+        VideoManager.clearLastError();
+
         try {
             const enabledCats = ParentalControls.getEnabledCategories();
 
@@ -132,9 +127,12 @@ const App = (() => {
             );
 
             mixedVideos = [];
+            let apiError = null;
             results.forEach(r => {
                 if (r.status === 'fulfilled' && r.value.length > 0) {
                     mixedVideos.push(...r.value);
+                } else if (r.status === 'rejected') {
+                    apiError = apiError || r.reason;
                 }
             });
 
@@ -146,13 +144,7 @@ const App = (() => {
                 if (!navigator.onLine) {
                     showOfflineScreen();
                 } else {
-                    feedEl.innerHTML = `
-                        <div class="video-slide slide-center">
-                            <div class="video-loading">
-                                <p>No videos found. Check your settings.</p>
-                            </div>
-                        </div>
-                    `;
+                    showErrorScreen(feedEl, apiError);
                 }
                 return;
             }
@@ -161,14 +153,44 @@ const App = (() => {
             PlayerManager.updateNavButtons();
         } catch (err) {
             console.error('Failed to load mixed feed:', err);
-            feedEl.innerHTML = `
-                <div class="video-slide slide-center">
-                    <div class="video-loading">
-                        <p>Something went wrong. Please try again.</p>
-                    </div>
-                </div>
-            `;
+            showErrorScreen(feedEl, err);
         }
+    }
+
+    function showErrorScreen(feedEl, error) {
+        const errorType = error?.errorType || VideoManager.getLastError()?.type || '';
+        let icon = '&#9888;&#65039;';
+        let title = 'Something went wrong';
+        let message = 'Please try again later.';
+
+        if (errorType === 'server') {
+            icon = '&#9888;&#65039;';
+            title = 'Video sources unavailable';
+            message = 'Could not reach video servers. Please try again in a few minutes.';
+        } else if (errorType === 'network' || !navigator.onLine) {
+            showOfflineScreen();
+            return;
+        } else if (!error) {
+            // No API error but still no videos — genuinely no matching results
+            icon = '&#128269;';
+            title = 'No videos found';
+            message = 'Try enabling more categories or languages in settings.';
+        }
+
+        feedEl.innerHTML = `
+            <div class="video-slide slide-center">
+                <div class="video-loading">
+                    <div style="font-size:48px;margin-bottom:16px">${icon}</div>
+                    <h2 style="margin-bottom:8px;font-size:20px">${title}</h2>
+                    <p style="color:#aaa;font-size:14px;max-width:280px;margin:0 auto">${message}</p>
+                    <button id="retry-feed-btn" class="btn-primary" style="margin-top:20px;width:auto;padding:12px 32px">Try Again</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('retry-feed-btn')?.addEventListener('click', () => {
+            VideoManager.clearCache();
+            loadMixedFeed();
+        });
     }
 
     // ---- Video Change Handler ----
@@ -208,42 +230,44 @@ const App = (() => {
         }
     }
 
-    // ---- Mute Toggle ----
+    // ---- Mute / Unmute (single source of truth) ----
 
-    function setupMuteToggle() {
-        const muteBtn = document.getElementById('mute-toggle');
-        const muteIcon = document.getElementById('mute-icon');
+    const ICON_MUTED = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" fill="white"/></svg>';
+    const ICON_UNMUTED = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M3,9v6h4l5,5V4L7,9H3z M16.5,12c0-1.77-1.02-3.29-2.5-4.03v8.05C15.48,15.29,16.5,13.77,16.5,12z M14,3.23v2.06c2.89,0.86,5,3.54,5,6.71s-2.11,5.85-5,6.71v2.06c4.01-0.91,7-4.49,7-8.77S18.01,4.14,14,3.23z" fill="white"/></svg>';
 
-        muteBtn.addEventListener('click', () => {
-            const muted = PlayerManager.toggleMute();
-            if (muted) {
-                muteIcon.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" fill="white"/></svg>';
-            } else {
-                muteIcon.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M3,9v6h4l5,5V4L7,9H3z M16.5,12c0-1.77-1.02-3.29-2.5-4.03v8.05C15.48,15.29,16.5,13.77,16.5,12z M14,3.23v2.06c2.89,0.86,5,3.54,5,6.71s-2.11,5.85-5,6.71v2.06c4.01-0.91,7-4.49,7-8.77S18.01,4.14,14,3.23z" fill="white"/></svg>';
-            }
-            muteBtn.querySelector('.action-label').textContent = muted ? 'Muted' : 'Sound';
-        });
+    // Single function to sync mute button icon + label with actual state
+    function updateMuteUI() {
+        const isMuted = PlayerManager.getMuteState();
+        document.getElementById('mute-icon').innerHTML = isMuted ? ICON_MUTED : ICON_UNMUTED;
+        const label = document.querySelector('#mute-toggle .action-label');
+        if (label) label.textContent = isMuted ? 'Muted' : 'Sound';
+        // Hide "tap to unmute" overlay once user has unmuted
+        if (!isMuted) {
+            const overlay = document.getElementById('unmute-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
     }
 
-    // ---- Unmute Overlay ----
+    function setupMuteToggle() {
+        document.getElementById('mute-toggle').addEventListener('click', () => {
+            PlayerManager.toggleMute();
+            updateMuteUI();
+        });
+    }
 
     function setupUnmuteOverlay() {
         const overlay = document.getElementById('unmute-overlay');
         if (!overlay) return;
 
-        // Show overlay once the first video starts loading
+        // Show overlay so user knows to tap to hear audio
         overlay.classList.remove('hidden');
 
         overlay.addEventListener('click', () => {
             // Unmute if currently muted
             if (PlayerManager.getMuteState()) {
-                const muted = PlayerManager.toggleMute();
-                // Update the mute button icon to match
-                const muteIcon = document.getElementById('mute-icon');
-                const muteBtn = document.getElementById('mute-toggle');
-                muteIcon.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M3,9v6h4l5,5V4L7,9H3z M16.5,12c0-1.77-1.02-3.29-2.5-4.03v8.05C15.48,15.29,16.5,13.77,16.5,12z M14,3.23v2.06c2.89,0.86,5,3.54,5,6.71s-2.11,5.85-5,6.71v2.06c4.01-0.91,7-4.49,7-8.77S18.01,4.14,14,3.23z" fill="white"/></svg>';
-                muteBtn.querySelector('.action-label').textContent = 'Sound';
+                PlayerManager.toggleMute();
             }
+            updateMuteUI();
             overlay.classList.add('hidden');
         });
     }

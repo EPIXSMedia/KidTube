@@ -1,5 +1,6 @@
 /* ========================================
    KidTube - Video Fetching & Category Logic
+   Uses Piped API (no API key needed)
    ======================================== */
 
 const VideoManager = (() => {
@@ -151,12 +152,24 @@ const VideoManager = (() => {
         }
     };
 
-    let apiKey = '';
-    let videoCache = {};  // categoryId -> video[]
-    let pageTokens = {};  // categoryId -> nextPageToken
+    // Piped API instances — tried in order, auto-rotates on failure
+    const PIPED_INSTANCES = [
+        'https://pipedapi.kavin.rocks',
+        'https://pipedapi.r4fo.com',
+        'https://pipedapi.adminforge.de'
+    ];
+    let currentInstanceIndex = 0;
 
-    function setApiKey(key) {
-        apiKey = key;
+    let videoCache = {};  // categoryId -> video[]
+    let pageTokens = {};  // categoryId -> nextPageToken (Piped nextpage)
+    let lastError = null; // Track last API error for UI
+
+    function getLastError() {
+        return lastError;
+    }
+
+    function clearLastError() {
+        lastError = null;
     }
 
     function getCategories() {
@@ -184,10 +197,26 @@ const VideoManager = (() => {
         return template.replace(/\{lang\}/g, lang);
     }
 
-    // Fetch videos for a category from YouTube API
-    async function fetchVideos(categoryId, loadMore = false) {
-        if (!apiKey) throw new Error('API key not set');
+    // Create a timeout signal (fallback for older browsers without AbortSignal.timeout)
+    function createTimeoutSignal(ms) {
+        if (typeof AbortSignal.timeout === 'function') {
+            return AbortSignal.timeout(ms);
+        }
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), ms);
+        return controller.signal;
+    }
 
+    // Extract video ID from Piped URL like "/watch?v=abc123"
+    function extractVideoId(url) {
+        if (!url) return null;
+        const match = url.match(/[?&]v=([^&]+)/);
+        return match ? match[1] : null;
+    }
+
+    // Fetch videos for a category using Piped API (no API key needed)
+    // Tries multiple Piped instances for reliability
+    async function fetchVideos(categoryId, loadMore = false) {
         const category = CATEGORIES[categoryId];
         if (!category) throw new Error('Invalid category');
 
@@ -196,66 +225,82 @@ const VideoManager = (() => {
             return videoCache[categoryId];
         }
 
-        // Pick a random query from the category and fill in language
         const queryTemplate = category.queries[Math.floor(Math.random() * category.queries.length)];
         const query = buildQuery(queryTemplate);
-        const pageToken = loadMore ? (pageTokens[categoryId] || '') : '';
+        const nextpage = loadMore ? (pageTokens[categoryId] || '') : '';
 
-        const params = new URLSearchParams({
-            part: 'snippet',
-            q: query,
-            type: 'video',
-            videoDuration: 'short',       // Only short videos (< 4 min)
-            videoEmbeddable: 'true',      // Only videos that allow embedding
-            safeSearch: 'strict',          // Kid-safe content
-            maxResults: '15',
-            order: 'relevance',
-            key: apiKey
-        });
+        let lastErr = null;
 
-        if (pageToken) {
-            params.set('pageToken', pageToken);
-        }
+        // Try each Piped instance until one works
+        for (let i = 0; i < PIPED_INSTANCES.length; i++) {
+            const instanceIdx = (currentInstanceIndex + i) % PIPED_INSTANCES.length;
+            const instance = PIPED_INSTANCES[instanceIdx];
 
-        const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
-
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error?.message || 'API request failed');
-            }
-
-            const data = await response.json();
-            pageTokens[categoryId] = data.nextPageToken || '';
-
-            const videos = data.items
-                .filter(item => item.id?.videoId)
-                .map(item => ({
-                    id: item.id.videoId,
-                    title: decodeHTMLEntities(item.snippet.title),
-                    channel: item.snippet.channelTitle,
-                    thumbnail: item.snippet.thumbnails?.high?.url ||
-                               item.snippet.thumbnails?.medium?.url ||
-                               item.snippet.thumbnails?.default?.url,
-                    categoryId: categoryId
-                }));
-
-            if (!videoCache[categoryId]) {
-                videoCache[categoryId] = [];
-            }
-
-            if (loadMore) {
-                videoCache[categoryId] = [...videoCache[categoryId], ...videos];
+            let url;
+            if (loadMore && nextpage) {
+                url = `${instance}/nextpage/search?q=${encodeURIComponent(query)}&filter=videos&nextpage=${encodeURIComponent(nextpage)}`;
             } else {
-                videoCache[categoryId] = videos;
+                url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
             }
 
-            return videoCache[categoryId];
-        } catch (err) {
-            console.error('Failed to fetch videos:', err);
-            throw err;
+            try {
+                const response = await fetch(url, { signal: createTimeoutSignal(8000) });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Remember which instance worked
+                currentInstanceIndex = instanceIdx;
+                lastError = null;
+
+                // Save pagination token
+                pageTokens[categoryId] = data.nextpage || '';
+
+                // Map Piped items to our video format
+                const videos = (data.items || [])
+                    .filter(item => {
+                        const videoId = extractVideoId(item.url);
+                        if (!videoId) return false;
+                        // Accept shorts (isShort flag) or short videos (< 4 min)
+                        if (item.isShort) return true;
+                        if (item.duration > 0 && item.duration <= 240) return true;
+                        return false;
+                    })
+                    .map(item => ({
+                        id: extractVideoId(item.url),
+                        title: item.title || '',
+                        channel: item.uploaderName || '',
+                        thumbnail: item.thumbnail || '',
+                        categoryId: categoryId
+                    }));
+
+                if (!videoCache[categoryId]) {
+                    videoCache[categoryId] = [];
+                }
+
+                if (loadMore) {
+                    videoCache[categoryId] = [...videoCache[categoryId], ...videos];
+                } else {
+                    videoCache[categoryId] = videos;
+                }
+
+                return videoCache[categoryId];
+            } catch (err) {
+                console.warn(`Piped instance ${instance} failed:`, err.message);
+                lastErr = err;
+                continue; // try next instance
+            }
         }
+
+        // All instances failed
+        console.error('All Piped instances failed:', lastErr);
+        lastError = { type: 'server', message: lastErr?.message || 'All video sources unavailable' };
+        const err = new Error('All video sources are currently unavailable');
+        err.errorType = 'server';
+        throw err;
     }
 
     // Get cached videos for a category
@@ -274,19 +319,13 @@ const VideoManager = (() => {
         }
     }
 
-    // Decode HTML entities in titles (reuse single element)
-    const _decodeEl = document.createElement('textarea');
-    function decodeHTMLEntities(text) {
-        _decodeEl.innerHTML = text;
-        return _decodeEl.value;
-    }
-
     return {
-        setApiKey,
         getCategories,
         getCategoryName,
         fetchVideos,
         getCachedVideos,
-        clearCache
+        clearCache,
+        getLastError,
+        clearLastError
     };
 })();

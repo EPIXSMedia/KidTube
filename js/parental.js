@@ -8,7 +8,7 @@ const ParentalControls = (() => {
         PIN: 'kidtube_pin',
         TIME_LIMIT_ENABLED: 'kidtube_time_limit_enabled',
         TIME_LIMIT_MINUTES: 'kidtube_time_limit_minutes',
-        API_KEY: 'kidtube_api_key',
+        API_KEY: 'kidtube_api_key', // legacy, no longer used
         ENABLED_CATEGORIES: 'kidtube_enabled_categories',
         ENABLED_LANGUAGES: 'kidtube_enabled_languages',
         BEDTIME_ENABLED: 'kidtube_bedtime_enabled',

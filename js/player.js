@@ -30,7 +30,7 @@ const PlayerManager = (() => {
         if (!container) {
             container = document.createElement('div');
             container.id = 'preload-container';
-            container.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;overflow:hidden;pointer-events:none;opacity:0;z-index:-1;';
+            container.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;overflow:hidden;pointer-events:none;opacity:0.01;z-index:-1;';
             document.body.appendChild(container);
         }
         return container;
@@ -100,7 +100,7 @@ const PlayerManager = (() => {
     function updateVideos(videoList, currentIdx) {
         videos = videoList;
         currentVideoIndex = currentIdx;
-        clearPreloads();
+        // Don't clear existing preloads — they're already buffered
         preloadUpcoming();
     }
 
@@ -124,47 +124,48 @@ const PlayerManager = (() => {
         return iframe;
     }
 
-    // Preload upcoming videos — they autoplay muted off-screen to buffer
+    // Create and add a single preload iframe
+    function addPreload(container, idx) {
+        if (idx < 0 || idx >= videos.length || preloaded.has(idx)) return;
+        const video = videos[idx];
+        const iframe = createIframe(video.id, true);
+        iframe.dataset.videoIndex = idx;
+        container.appendChild(iframe);
+        preloaded.set(idx, { iframe, loaded: false });
+
+        iframe.addEventListener('load', () => {
+            const entry = preloaded.get(idx);
+            if (entry) entry.loaded = true;
+        }, { once: true });
+    }
+
+    // Preload upcoming videos — staggered to reduce bandwidth contention
     function preloadUpcoming() {
         const container = getPreloadContainer();
 
-        for (let i = 1; i <= MAX_PRELOAD; i++) {
-            const nextIdx = currentVideoIndex + i;
-            if (nextIdx < videos.length && !preloaded.has(nextIdx)) {
-                const video = videos[nextIdx];
-                const iframe = createIframe(video.id, true);
-                iframe.dataset.videoIndex = nextIdx;
-                container.appendChild(iframe);
-                preloaded.set(nextIdx, { iframe, loaded: false });
-
-                iframe.addEventListener('load', () => {
-                    const entry = preloaded.get(nextIdx);
-                    if (entry) entry.loaded = true;
-                }, { once: true });
-            }
-        }
-
-        // Preload previous
-        const prevIdx = currentVideoIndex - 1;
-        if (prevIdx >= 0 && !preloaded.has(prevIdx)) {
-            const video = videos[prevIdx];
-            const iframe = createIframe(video.id, true);
-            iframe.dataset.videoIndex = prevIdx;
-            container.appendChild(iframe);
-            preloaded.set(prevIdx, { iframe, loaded: false });
-
-            iframe.addEventListener('load', () => {
-                const entry = preloaded.get(prevIdx);
-                if (entry) entry.loaded = true;
-            }, { once: true });
-        }
-
-        // Clean up distant preloads
+        // Clean up distant preloads first (frees resources)
         for (const [idx, entry] of preloaded) {
             if (Math.abs(idx - currentVideoIndex) > MAX_PRELOAD + 1) {
                 entry.iframe.remove();
                 preloaded.delete(idx);
             }
+        }
+
+        // Next video loads immediately (most likely to be swiped to)
+        addPreload(container, currentVideoIndex + 1);
+
+        // Stagger the rest to avoid bandwidth contention
+        for (let i = 2; i <= MAX_PRELOAD; i++) {
+            const idx = currentVideoIndex + i;
+            if (idx < videos.length && !preloaded.has(idx)) {
+                setTimeout(() => addPreload(container, idx), (i - 1) * 1500);
+            }
+        }
+
+        // Preload previous (low priority, after forward preloads)
+        const prevIdx = currentVideoIndex - 1;
+        if (prevIdx >= 0 && !preloaded.has(prevIdx)) {
+            setTimeout(() => addPreload(container, prevIdx), MAX_PRELOAD * 1500);
         }
     }
 

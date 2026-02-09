@@ -70,6 +70,14 @@ const PlayerManager = (() => {
         }
     }
 
+    // Retry a command multiple times — YouTube API may not be ready immediately
+    function postCommandRetry(iframe, command, args, retries = 4, delay = 300) {
+        postCommand(iframe, command, args);
+        for (let i = 1; i <= retries; i++) {
+            setTimeout(() => postCommand(iframe, command, args), delay * i);
+        }
+    }
+
     function init(options = {}) {
         onVideoChangeCallback = options.onVideoChange || null;
         onNeedMoreVideosCallback = options.onNeedMoreVideos || null;
@@ -189,6 +197,9 @@ const PlayerManager = (() => {
             setTimeout(() => {
                 if (loading.parentNode) loading.remove();
             }, 300);
+            // Ensure mute state matches user preference after load
+            const muteCmd = isMuted ? 'mute' : 'unMute';
+            postCommandRetry(iframe, muteCmd);
         };
 
         slide.appendChild(iframe);
@@ -242,15 +253,6 @@ const PlayerManager = (() => {
         newSlide.appendChild(iframe);
         feedEl.appendChild(newSlide);
 
-        // If preloaded iframe was muted but user wants sound, unmute via API
-        if (wasPreloaded && !isMuted) {
-            postCommand(iframe, 'unMute');
-        }
-        // If preloaded, make sure it's playing (it may have paused off-screen)
-        if (wasPreloaded) {
-            postCommand(iframe, 'playVideo');
-        }
-
         // Trigger slide animation
         requestAnimationFrame(() => {
             if (oldSlide) {
@@ -263,6 +265,13 @@ const PlayerManager = (() => {
                 newSlide.id = 'current-slide';
                 currentVideoIndex = newIndex;
                 isTransitioning = false;
+
+                // Apply mute state after transition — retry so YouTube API has time to init
+                if (wasPreloaded) {
+                    const muteCmd = isMuted ? 'mute' : 'unMute';
+                    postCommandRetry(iframe, muteCmd);
+                    postCommandRetry(iframe, 'playVideo');
+                }
 
                 if (onVideoChangeCallback) {
                     onVideoChangeCallback(video, newIndex, videos.length);
